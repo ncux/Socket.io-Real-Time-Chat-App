@@ -12,17 +12,26 @@ app.get('/', router);
 const server = http.createServer(app);
 
 const io = socketIO(server);
-io.on('connection', (socket) => {
+io.on('connection', socket => {
     console.log('new connection');
 
     socket.on('join', ({ name, room }, cb) => {
         console.log(name, room);
-        const { error, user } = addUser({ id: socket.id, name, room });
+        const user = { id: socket.id, name, room };
+        const { error } = addUser(user);
         if(error) return cb(error);
 
-        socket.emit('sys_message', { user: 'admin', text: `Welcome to the ${user.room} chat room, ${user.name}` });
-        socket.broadcast.to(user.room).emit('sys_message', { user: 'admin', text: `${user.name} has joined the chat room` });
+        socket.emit('message', { user: 'admin', text: `Welcome, ${user.name}` });
+        socket.broadcast.to(user.room).emit('message', { user: 'admin', text: `${user.name} has joined the chat room` });
         socket.join(user.room);
+        cb();
+    });
+
+    // handle user messages
+    socket.on('user_message', (message, cb) => {
+        const user = getUser(socket.id);
+        io.to(user.room).emit('message', { user: user.name, text: message });
+        cb();
     });
 
     socket.on('disconnect', () => console.log('disconnected'));
